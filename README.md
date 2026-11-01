@@ -90,9 +90,11 @@ Tank war/
 ├── README.md                      # Documentation du projet
 ├── settings.py                    # Constantes globales, dimensions et palette de couleurs
 ├── generate_assets.py             # Script de génération des sprites PNG cartoon
+├── generate_icons.py              # Script de génération des 28 icônes PNG 32-bit d'interface
 ├── main.py                        # Visualisateur de l'arène 2D avec débogage des collisions
 │
 ├── assets/                        # Ressources multimédias
+│   ├── icons/                     # 28 icônes cartoon transparentes (menu/, network/, hud/, pause/, results/)
 │   ├── maps/                      # Textures de la carte (desert_background.png, border_tile.png)
 │   ├── obstacles/                 # Sprites PNG transparents (crates, barriers, rocks, plants)
 │   ├── sounds/                    # Effets sonores
@@ -119,7 +121,8 @@ Tank war/
 │
 ├── interface/                     # Interface utilisateur complète (Cartoon 2D)
 │   ├── __init__.py
-│   ├── components.py              # Composants réutilisables (UIButton, UITextInput, UIPanel)
+│   ├── components.py              # Composants réutilisables (UIButton avec icônes, UITextInput, UIPanel)
+│   ├── icon_manager.py            # Gestionnaire d'icônes PNG avec cache, scaling et états visuels
 │   ├── menu.py                    # Menu Principal (Logo, Jouer, Héberger, Rejoindre, Quitter)
 │   ├── lobby.py                   # Salon d'attente (Fiches joueurs, statut Prêt, compte à rebours)
 │   ├── screens.py                 # Écrans Héberger (IP/Port), Rejoindre (Saisie IP), Pause, Fin de Match
@@ -146,11 +149,12 @@ Tank war/
 │   ├── network/                   # Couche réseau TCP
 │   └── ui/                        # Menus et composants d'interface
 │
-└── tests/                         # Suite de 75 tests automatisés Pytest
+└── tests/                         # Suite de 80 tests automatisés Pytest
     ├── test_audio_visuals.py      # Tests AssetManager, SoundManager et EffectsManager
     ├── test_collisions_advanced.py# Anti-tunneling (CCD), destruction caisses, débris
     ├── test_combat.py             # Tests balistiques, cooldown, tir canon et dégâts
     ├── test_config.py             # Validation des constantes
+    ├── test_icon_manager.py       # Validation d'IconManager, scaling, états et intégration boutons
     ├── test_map.py                # Tests des collisions, bordures, spawns et décors
     ├── test_models.py             # Tests du domaine (Vector2D, collisions, commandes)
     ├── test_network.py            # Handshake, framing \n, diffusion 30 Hz, reconnexion, déconnexion
@@ -289,14 +293,14 @@ Le jeu fonctionne intégralement **sans connexion à Internet**. Deux configurat
 
 ## 🧪 Suite de Tests Automatisés
 
-Le projet comprend **75 tests automatisés** couvrant l'intégralité du cycle de vie du jeu (physique CCD, balistique, synchronisation réseau TCP, déconnexions/reconnexions, cycle d'arbitrage et composants d'interface).
+Le projet comprend **80 tests automatisés** couvrant l'intégralité du cycle de vie du jeu (physique CCD, balistique, synchronisation réseau TCP, déconnexions/reconnexions, cycle d'arbitrage, composants d'interface et gestionnaire d'icônes).
 
 Pour exécuter la suite complète de tests :
 ```powershell
 .\.venv\Scripts\pytest.exe -v
 ```
 
-Tous les modules sont vérifiés et garantissent un taux de réussite de **100% (75/75)**.
+Tous les modules sont vérifiés et garantissent un taux de réussite de **100% (80/80)**.
 
 ---
 

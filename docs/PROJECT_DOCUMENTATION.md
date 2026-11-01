@@ -97,6 +97,7 @@ Tank war/
 ├── README.md                   # Présentation rapide, installation et démarrage
 │
 ├── assets/                     # Ressources graphiques et sonores
+│   ├── icons/                  # 28 icônes cartoon transparentes 32-bit (menu/, network/, hud/, pause/, results/)
 │   ├── maps/                   # desert_background.png, border_tile.png
 │   ├── obstacles/              # crate.png, barrier_horizontal.png, rock_large.png, plant_cactus.png...
 │   ├── powerups/               # shield.png, speed.png, rapid_fire.png
@@ -126,7 +127,8 @@ Tank war/
 │
 ├── interface/                  # Composants et écrans graphiques
 │   ├── __init__.py
-│   ├── components.py           # UIButton, UITextInput, UIPanel (widgets compatibles clavier et souris)
+│   ├── components.py           # UIButton avec icônes, UITextInput, UIPanel
+│   ├── icon_manager.py         # IconManager (cache multi-niveaux, redimensionnement et gestion d'états)
 │   ├── hud.py                  # Affichage tête haute (cœurs de vie, score, chrono, pips de recharge)
 │   ├── lobby.py                # LobbyScreen (fiches joueurs, bouton Prêt et compte à rebours 3s)
 │   ├── menu.py                 # MainMenu (logo animé, boutons Jouer, Héberger, Rejoindre, Quitter)
@@ -145,11 +147,12 @@ Tank war/
 │   ├── controls.py             # TankControls (mappage ZQSD / Flèches et requêtes de tir)
 │   └── tank.py                 # Tank (hitbox, vies, vitesses, tourelle, canon, rotation et bouclier)
 │
-└── tests/                      # Suite de 75 tests automatisés Pytest
+└── tests/                      # Suite de 80 tests automatisés Pytest
     ├── test_audio_visuals.py   # Validation de l'AssetManager, SoundManager et EffectsManager
     ├── test_collisions_advanced.py # Anti-tunneling CCD, barrières métalliques, caisses destructibles
     ├── test_combat.py          # Tirs simultanés, cooldowns balistiques, dégâts et portée
     ├── test_config.py          # Cohérence des constantes globales de settings.py
+    ├── test_icon_manager.py    # Tests IconManager, redimensionnement, états visuels et boutons
     ├── test_map.py             # Dimensions arène, spawns inoccupés, obstacles physiques
     ├── test_models.py          # Modèles mathématiques vectoriels et sérialisation
     ├── test_network.py         # Framing \n, handshake, diffusion 30 Hz, déconnexion/reconnexion
