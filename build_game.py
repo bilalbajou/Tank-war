@@ -40,15 +40,48 @@ def run_cmd(cmd: list[str], desc: str) -> bool:
     return True
 
 
-def ensure_pyinstaller() -> bool:
-    """Installe PyInstaller dans l'environnement virtuel si absent."""
+def ensure_dependencies() -> bool:
+    """Installe PyInstaller et Pillow dans l'environnement virtuel si absent."""
+    ok = True
     try:
         import PyInstaller
         print(f"[BUILD] PyInstaller détecté (version {PyInstaller.__version__}).")
-        return True
     except ImportError:
         print("[BUILD] PyInstaller non trouvé. Installation automatique via pip...")
-        return run_cmd([sys.executable, "-m", "pip", "install", "pyinstaller"], "Installation de PyInstaller")
+        ok = run_cmd([sys.executable, "-m", "pip", "install", "pyinstaller"], "Installation de PyInstaller") and ok
+
+    try:
+        import PIL
+    except ImportError:
+        print("[BUILD] Pillow non trouvé. Installation automatique via pip...")
+        ok = run_cmd([sys.executable, "-m", "pip", "install", "pillow"], "Installation de Pillow") and ok
+
+    return ok
+
+
+def ensure_app_ico() -> None:
+    """Génère l'icône Windows multi-résolution app.ico si absente."""
+    ico_path = ASSETS_DIR / "icons" / "app.ico"
+    if ico_path.exists():
+        return
+    tank_img = ASSETS_DIR / "tanks" / "tank_green.png"
+    if not tank_img.exists():
+        return
+    try:
+        from PIL import Image
+        tank = Image.open(tank_img).convert("RGBA")
+        canvas = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+        ratio = min(210 / tank.width, 210 / tank.height)
+        new_w = int(tank.width * ratio)
+        new_h = int(tank.height * ratio)
+        resized = tank.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        pos = ((256 - new_w) // 2, (256 - new_h) // 2)
+        canvas.paste(resized, pos, resized)
+        ico_sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+        canvas.save(ico_path, format="ICO", sizes=ico_sizes)
+        print("[BUILD] [OK] assets/icons/app.ico généré avec succès.")
+    except Exception as e:
+        print(f"[AVERTISSEMENT] Impossible de générer app.ico: {e}")
 
 
 def verify_assets() -> bool:
@@ -65,6 +98,7 @@ def verify_assets() -> bool:
         if not run_cmd([sys.executable, "generate_assets.py"], "Génération des sprites"):
             return False
 
+    ensure_app_ico()
     return True
 
 
@@ -102,7 +136,7 @@ def main() -> int:
     print("PIPELINE DE DÉPLOIEMENT TANK WAR : ARENA DUEL")
     print("=" * 65)
 
-    if not ensure_pyinstaller():
+    if not ensure_dependencies():
         return 1
 
     if not verify_assets():

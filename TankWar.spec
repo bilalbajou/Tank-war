@@ -11,8 +11,8 @@ from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
-# Racine du projet
-project_dir = Path(__file__).resolve().parent
+# Racine du projet (SPECPATH est fourni nativement par PyInstaller lors de l'exécution du .spec)
+project_dir = Path(SPECPATH).resolve() if "SPECPATH" in globals() else Path.cwd().resolve()
 
 # Collecte des données (assets, images, sons, icônes)
 datas = [
@@ -66,7 +66,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=str(project_dir / "assets" / "icons" / "menu" / "play.png") if (project_dir / "assets" / "icons" / "menu" / "play.png").exists() else None,
+    icon=str(project_dir / "assets" / "icons" / "app.ico") if (project_dir / "assets" / "icons" / "app.ico").exists() else None,
 )
 
 coll = COLLECT(
