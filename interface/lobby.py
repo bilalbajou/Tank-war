@@ -54,6 +54,9 @@ class LobbyScreen:
         self.countdown: Optional[float] = None
         self.is_starting = False
 
+        # Mode IA : difficulté par défaut
+        self.ai_difficulty = "medium"
+
         # Typographies
         self.font_player_title = pygame.font.SysFont("Segoe UI", 32, bold=True)
         self.font_role = pygame.font.SysFont("Segoe UI", 18, bold=True)
@@ -66,7 +69,14 @@ class LobbyScreen:
         btn_h = 58
         center_x = SCREEN_WIDTH // 2
 
-        ready_text = "TOUS PRÊTS" if self.mode == "local" else "JE SUIS PRÊT"
+        if self.mode == "ai":
+            ready_text = "LANCER LA MISSION"
+            self.p2_ready = True  # Le bot IA est toujours prêt
+        elif self.mode == "local":
+            ready_text = "TOUS PRÊTS"
+        else:
+            ready_text = "JE SUIS PRÊT"
+
         self.btn_ready = UIButton(
             pygame.Rect(center_x - 280, 680, btn_w, btn_h),
             text=ready_text,
@@ -87,7 +97,30 @@ class LobbyScreen:
             on_click=self.leave,
         )
 
+        # Bouton sélecteur de difficulté de l'IA (en mode solo uniquement)
+        self.btn_diff = UIButton(
+            pygame.Rect(center_x - 140, 612, 280, 48),
+            text="IA : MOYEN (VÉTÉRAN)",
+            scheme="amber",
+            font_size=18,
+            icon_name="menu/settings",
+            icon_size=(22, 22),
+            on_click=self.toggle_ai_difficulty,
+        )
+
         self.anim_time = 0.0
+
+    def toggle_ai_difficulty(self) -> None:
+        """Fait défiler les niveaux de difficulté de l'IA (Facile -> Moyen -> Difficile)."""
+        diffs = ["easy", "medium", "hard"]
+        idx = (diffs.index(self.ai_difficulty) + 1) % len(diffs)
+        self.ai_difficulty = diffs[idx]
+        labels = {
+            "easy": "IA : FACILE (RECRUE)",
+            "medium": "IA : MOYEN (VÉTÉRAN)",
+            "hard": "IA : DIFFICILE (ÉLITE)",
+        }
+        self.btn_diff.text = labels[self.ai_difficulty]
 
     def toggle_local_ready(self) -> None:
         """Bascule l'état de préparation du joueur local."""
@@ -113,6 +146,12 @@ class LobbyScreen:
             self.btn_ready.scheme = "red" if self.p1_ready else "green"
             self.btn_ready.icon_name = "network/disconnected" if self.p1_ready else "network/connected"
 
+        elif self.mode == "ai":
+            self.p1_ready = not self.p1_ready
+            self.btn_ready.text = "ANNULER" if self.p1_ready else "LANCER LA MISSION"
+            self.btn_ready.scheme = "red" if self.p1_ready else "green"
+            self.btn_ready.icon_name = "network/disconnected" if self.p1_ready else "network/connected"
+
     def leave(self) -> None:
         """Ferme la session et quitte le salon."""
         if self.client:
@@ -131,6 +170,9 @@ class LobbyScreen:
                 self.toggle_local_ready()
                 return
 
+        if self.mode == "ai":
+            self.btn_diff.handle_event(event)
+
         self.btn_ready.handle_event(event)
         self.btn_leave.handle_event(event)
 
@@ -139,6 +181,8 @@ class LobbyScreen:
         self.anim_time += dt
         self.btn_ready.update(dt)
         self.btn_leave.update(dt)
+        if self.mode == "ai":
+            self.btn_diff.update(dt)
 
         # 1. Synchronisation réseau en mode Hôte
         if self.mode == "host" and self.server:
@@ -188,6 +232,18 @@ class LobbyScreen:
             else:
                 self.countdown = None
 
+        # 4. Mode Solo contre IA
+        elif self.mode == "ai":
+            if self.p1_ready and self.p2_ready:
+                if self.countdown is None:
+                    self.countdown = 1.5
+                self.countdown -= dt
+                if self.countdown <= 0.0:
+                    self.on_start_game()
+                    return
+            else:
+                self.countdown = None
+
     def draw(self, surface: pygame.Surface) -> None:
         """Dessine l'écran du lobby avec les fiches des 2 joueurs."""
         surface.fill((22, 20, 24))
@@ -210,12 +266,13 @@ class LobbyScreen:
         card_w = 380
         card_h = 360
         card_y = 170
+        p1_role = "HUMAIN (COMMANDES ZQSD)" if self.mode == "ai" else ("HÔTE DE LA PARTIE" if self.mode != "local" else "JOUEUR 1 (ZQSD)")
         self._draw_player_card(
             surface,
             rect=pygame.Rect(panel_rect.x + 60, card_y, card_w, card_h),
             player_num=1,
             name="Joueur 1 (Rouge)",
-            role="HÔTE DE LA PARTIE" if self.mode != "local" else "JOUEUR 1 (ZQSD)",
+            role=p1_role,
             is_ready=self.p1_ready,
             color=(231, 76, 60),
             tank_color="red",
@@ -234,19 +291,22 @@ class LobbyScreen:
         if self.mode == "host" and self.server:
             is_client_connected = self.server.has_client_connected()
 
-        p2_role = "CLIENT DISTANT" if self.mode != "local" else "JOUEUR 2 (FLÈCHES)"
-        if not is_client_connected:
-            p2_status_str = "En attente de connexion..."
+        if self.mode == "ai":
+            p2_name = "Tank Bot (IA)"
+            p2_role = f"INTELLIGENCE ARTIFICIELLE ({self.ai_difficulty.upper()})"
+            p2_status_str = f"IA PRÊTE ({self.ai_difficulty.upper()})"
         else:
-            p2_status_str = None
+            p2_name = "Joueur 2 (Vert)"
+            p2_role = "CLIENT DISTANT" if self.mode != "local" else "JOUEUR 2 (FLÈCHES)"
+            p2_status_str = "En attente de connexion..." if not is_client_connected else None
 
         self._draw_player_card(
             surface,
             rect=pygame.Rect(panel_rect.right - 60 - card_w, card_y, card_w, card_h),
             player_num=2,
-            name="Joueur 2 (Vert)",
+            name=p2_name,
             role=p2_role,
-            is_ready=self.p2_ready if is_client_connected else False,
+            is_ready=self.p2_ready if (is_client_connected or self.mode == "ai") else False,
             color=(46, 204, 113),
             tank_color="green",
             custom_status=p2_status_str,
@@ -262,11 +322,16 @@ class LobbyScreen:
             surface.blit(shadow_cd, (cd_rect.x + 2, cd_rect.y + 3))
             surface.blit(txt_cd, cd_rect)
         else:
-            hint_str = "Appuyez sur 'Je suis prêt' pour lancer le match lorsque les deux joueurs sont connectés."
+            if self.mode == "ai":
+                hint_str = "Cliquez sur 'Lancer la mission' pour engager le combat contre le robot."
+            else:
+                hint_str = "Appuyez sur 'Je suis prêt' pour lancer le match lorsque les deux joueurs sont connectés."
             txt_hint = self.font_info.render(hint_str, True, (170, 180, 195))
             surface.blit(txt_hint, txt_hint.get_rect(center=(center_x, 580)))
 
         # Boutons
+        if self.mode == "ai":
+            self.btn_diff.draw(surface)
         self.btn_ready.draw(surface)
         self.btn_leave.draw(surface)
 

@@ -20,6 +20,17 @@ import pytest
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 pygame.init()
 
+
+@pytest.fixture(autouse=True)
+def ensure_pygame():
+    if not pygame.get_init():
+        pygame.init()
+    if not pygame.font.get_init():
+        pygame.font.init()
+    if not pygame.display.get_surface():
+        pygame.display.set_mode((1600, 900))
+    yield
+
 from interface.components import UIButton, UITextInput
 from interface.menu import MainMenu
 from interface.screens import HostScreen, JoinScreen, PauseOverlay, GameOverOverlay

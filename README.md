@@ -12,12 +12,12 @@ Deux tanks s'affrontent dans une arène désertique fermée parsemée d'obstacle
 | :--- | :--- |
 | **Langage** | Python 3.12+ (testé et compatible 3.14) |
 | **Moteur Graphique** | Pygame / Pygame-ce 2.5+ |
-| **Architecture Réseau** | Sockets TCP client/serveur avec framing binaire |
+| **Architecture Réseau** | Sockets TCP client/serveur autoritaire + Broadcast UDP (Auto-Discovery) |
 | **Sérialisation** | JSON standardisé |
-| **Concurrence** | Multithreading (Threads non-bloquants I/O réseau) |
+| **Concurrence** | Multithreading (Threads non-bloquants I/O réseau & découverte) |
 | **Résolution de référence** | 1600 × 900 (Format 16:9 fixe) |
 | **Fréquence de rafraîchissement** | 60 FPS constants avec delta-time |
-| **Suite de tests** | Pytest 8.0+ (80 tests unitaires & d'intégration) |
+| **Suite de tests** | Pytest 8.0+ (100 tests unitaires & d'intégration) |
 
 ---
 
@@ -30,6 +30,7 @@ Pour explorer chaque dimension du projet en profondeur, consultez les documents 
 | 📖 [**docs/PROJECT_DOCUMENTATION.md**](docs/PROJECT_DOCUMENTATION.md) | **Architecture Technique Complète** : Principes SOLID, diagrammes d'architecture et de flux, classes métier (`Tank`, `CollisionHandler`, `MatchState`), CCD anti-tunneling, moteur balistique, audio et pipeline d'actifs. |
 | 🌐 [**docs/NETWORK_GUIDE.md**](docs/NETWORK_GUIDE.md) | **Guide Réseau LAN Wi-Fi (Tutoriel Pas-à-Pas)** : Connexion 2 PC sans Internet, commandes PowerShell pour Pare-feu Windows, contournement de l'isolation AP, protocole TCP JSON à 30 Hz et diagrammes de séquence. |
 | 🎮 [**docs/USER_GUIDE.md**](docs/USER_GUIDE.md) | **Guide du Joueur & Commandes** : Règles des matchs, contrôles clavier/souris, power-ups (Bouclier, Vitesse, Tir Rapide), tactiques d'arène et gestion des manches. |
+| 🚀 [**docs/DEPLOYMENT_GUIDE.md**](docs/DEPLOYMENT_GUIDE.md) | **Guide de Déploiement & Publication** : Compilation en `.exe` autonome avec PyInstaller, création de l'installateur Inno Setup, publication sur Itch.io, GitHub Releases et Steam. |
 | ❓ [**docs/FAQ.md**](docs/FAQ.md) | **Dépannage & FAQ Technique** : Résolution des erreurs *Connection Refused*, *Connection Timeout*, déconnexions brutales, sous-réseaux, VPN et audio. |
 
 ---
@@ -85,16 +86,21 @@ Le projet applique une séparation stricte des responsabilités (inspirée de Cl
 
 ```text
 Tank war/
+├── .github/                       # CI/CD (GitHub Actions workflow de compilation et publication)
+│   └── workflows/build_and_publish.yml
 ├── .gitignore                     # Fichiers exclus du versionnement
 ├── requirements.txt               # Dépendances Python (pygame-ce, pytest)
 ├── README.md                      # Documentation du projet
 ├── settings.py                    # Constantes globales, dimensions et palette de couleurs
 ├── generate_assets.py             # Script de génération des sprites PNG cartoon
-├── generate_icons.py              # Script de génération des 28 icônes PNG 32-bit d'interface
-├── main.py                        # Visualisateur de l'arène 2D avec débogage des collisions
+├── generate_icons.py              # Script de génération des 30 icônes PNG 32-bit d'interface
+├── build_game.py                  # Script de compilation et packaging en exécutable autonome .exe
+├── TankWar.spec                   # Spécification PyInstaller avec inclusion complète des assets
+├── installer.iss                  # Script Inno Setup pour générer TankWar_Setup_v1.0.exe
+├── main.py                        # Orchestrateur central (Menu, Solo IA, LAN, Local 2J, Boucle 60 FPS)
 │
 ├── assets/                        # Ressources multimédias
-│   ├── icons/                     # 28 icônes cartoon transparentes (menu/, network/, hud/, pause/, results/)
+│   ├── icons/                     # 30 icônes cartoon transparentes (menu/, network/, hud/, pause/, results/)
 │   ├── maps/                      # Textures de la carte (desert_background.png, border_tile.png)
 │   ├── obstacles/                 # Sprites PNG transparents (crates, barriers, rocks, plants)
 │   ├── sounds/                    # Effets sonores
@@ -104,10 +110,12 @@ Tank war/
 │   ├── PROJECT_DOCUMENTATION.md   # Architecture technique complète, classes, CCD, SOLID
 │   ├── NETWORK_GUIDE.md           # Tutoriel pas-à-pas multijoueur LAN Wi-Fi sans Internet
 │   ├── USER_GUIDE.md              # Guide utilisateur, commandes, power-ups, tactiques
+│   ├── DEPLOYMENT_GUIDE.md        # Guide complet de déploiement, compilation et publication (Itch.io, Steam)
 │   └── FAQ.md                     # Dépannage réseau, pare-feu, timeout, crash, audio
 │
 ├── game/                          # Logique de jeu, carte et balistique
 │   ├── __init__.py
+│   ├── ai_controller.py           # Intelligence Artificielle (FSM, LoS raycasting, anti-stuck, visée prédictive)
 │   ├── asset_manager.py           # Cache mémoire des surfaces pré-pivotées et textures
 │   ├── collision.py               # Résolution continue des collisions (CCD anti-tunneling)
 │   ├── effects.py                 # Particules, explosions, étincelles et animations
@@ -123,17 +131,18 @@ Tank war/
 │   ├── __init__.py
 │   ├── components.py              # Composants réutilisables (UIButton avec icônes, UITextInput, UIPanel)
 │   ├── icon_manager.py            # Gestionnaire d'icônes PNG avec cache, scaling et états visuels
-│   ├── menu.py                    # Menu Principal (Logo, Jouer, Héberger, Rejoindre, Quitter)
-│   ├── lobby.py                   # Salon d'attente (Fiches joueurs, statut Prêt, compte à rebours)
+│   ├── menu.py                    # Menu Principal (Solo IA, Local 2J, Héberger, Rejoindre, Quitter)
+│   ├── lobby.py                   # Salon d'attente (Fiches joueurs, sélecteur difficulté IA, statut Prêt)
 │   ├── screens.py                 # Écrans Héberger (IP/Port), Rejoindre (Saisie IP), Pause, Fin de Match
 │   ├── hud.py                     # Affichage têtes-hautes (vies, score, timer, powerups)
 │   └── scoreboard.py              # Écran de fin de match et bandeau de mort subite
 │
-├── network/                       # Couche réseau multijoueur TCP autoritaire
+├── network/                       # Couche réseau multijoueur TCP autoritaire & découverte UDP
 │   ├── __init__.py
 │   ├── connection.py              # Sockets TCP avec TCP_NODELAY, thread I/O et framing \n
+│   ├── discovery.py               # Découverte automatique LAN (LANBeacon broadcast UDP & LANDiscoveryListener)
 │   ├── protocol.py                # Protocole JSON, commandes d'entrées, lobby et instantanés
-│   ├── server.py                  # Serveur TCP autoritaire (30 Hz, détection IP LAN)
+│   ├── server.py                  # Serveur TCP autoritaire (30 Hz, détection IP LAN & balise intégrée)
 │   └── client.py                  # Client TCP non-bloquant
 │
 ├── players/                       # Entités de chars et contrôleurs
@@ -149,12 +158,14 @@ Tank war/
 │   ├── network/                   # Couche réseau TCP
 │   └── ui/                        # Menus et composants d'interface
 │
-└── tests/                         # Suite de 80 tests automatisés Pytest
+└── tests/                         # Suite de 100 tests automatisés Pytest
+    ├── test_ai.py                 # Tests Intelligence Artificielle (FSM, LoS, anti-stuck, visée, intégration)
     ├── test_audio_visuals.py      # Tests AssetManager, SoundManager et EffectsManager
     ├── test_collisions_advanced.py# Anti-tunneling (CCD), destruction caisses, débris
     ├── test_combat.py             # Tests balistiques, cooldown, tir canon et dégâts
     ├── test_config.py             # Validation des constantes
     ├── test_icon_manager.py       # Validation d'IconManager, scaling, états et intégration boutons
+    ├── test_lan_discovery.py      # Tests découverte auto LAN (broadcast UDP, TTL, 1-clic UI)
     ├── test_map.py                # Tests des collisions, bordures, spawns et décors
     ├── test_models.py             # Tests du domaine (Vector2D, collisions, commandes)
     ├── test_network.py            # Handshake, framing \n, diffusion 30 Hz, reconnexion, déconnexion
@@ -214,22 +225,39 @@ pip install -r requirements.txt
 
 ### 3. Exécution du jeu
 
-#### A. Mode Multijoueur Réseau Local Wi-Fi (LAN sans Internet)
+#### A. Mode Solo contre l'Intelligence Artificielle (IA)
+Ce mode permet de s'entraîner seul face à un char vert autonome doté d'une machine à états tactique (patrouille, traque, strafe de combat, repli sous bouclier, collecte de power-ups, anti-blocage) :
+
+```bash
+# Lancement direct en mode Solo (difficulté moyenne par défaut)
+python main.py --ai
+
+# Spécification du niveau de difficulté (easy, medium, hard)
+python main.py --ai --difficulty hard
+```
+
+*3 profils de difficulté disponibles :*
+- **Facile (Recrue)** : Déplacement modéré, temps de réaction tolérant, tirs espacés.
+- **Moyen (Vétéran)** : Collecte tactique des bonus, strafe latéral, bonne réactivité.
+- **Difficile (Élite)** : Visée prédictive (*lead shots* calculant la vitesse de votre char), repli immédiat si vous ramassez un bouclier, tirs chirurgicaux.
+
+#### B. Mode Multijoueur Réseau Local Wi-Fi (LAN sans Internet — Zero-Config)
 Ce mode permet d'affronter un adversaire sur deux ordinateurs distincts connectés à la même box ou point d'accès Wi-Fi :
 
 1. **Sur le PC 1 (Serveur Hôte + Joueur 1 Rouge)** :
    ```bash
    python main.py --host
    ```
-   *L'application affiche l'adresse IP locale à communiquer à votre adversaire (ex: `192.168.1.45:4242`).*
+   *Ou cliquez simplement sur **« HÉBERGER UNE PARTIE »** depuis le menu.*  
+   *La balise UDP diffuse automatiquement l'existence de la partie sur le réseau local.*
 
-2. **Sur le PC 2 (Client distant + Joueur 2 Vert)** :
-   ```bash
-   python main.py --join 192.168.1.45
-   ```
-   *Le client se connecte instantanément, envoie ses commandes de touches et reçoit l'état officiel à 30 Hz.*
+2. **Sur le PC 2 (Client distant + Joueur 2 Vert — Détection Automatique)** :
+   - Lancez le jeu : `python main.py`
+   - Cliquez sur **« REJOINDRE UNE PARTIE »** : la partie du PC 1 apparaît **automatiquement** dans la liste des serveurs détectés.
+   - Cliquez sur **`REJOINDRE`** (1 seul clic, aucune adresse IP à taper !).
+   - *(Optionnel en ligne de commande directe : `python main.py --join 192.168.1.XX`).*
 
-#### B. Mode Local (2 joueurs sur le même ordinateur)
+#### C. Mode Local (2 joueurs sur le même ordinateur)
 ```bash
 python main.py --local
 ```
@@ -293,14 +321,14 @@ Le jeu fonctionne intégralement **sans connexion à Internet**. Deux configurat
 
 ## 🧪 Suite de Tests Automatisés
 
-Le projet comprend **80 tests automatisés** couvrant l'intégralité du cycle de vie du jeu (physique CCD, balistique, synchronisation réseau TCP, déconnexions/reconnexions, cycle d'arbitrage, composants d'interface et gestionnaire d'icônes).
+Le projet comprend **100 tests automatisés** couvrant l'intégralité du cycle de vie du jeu (physique CCD, balistique, synchronisation réseau TCP, déconnexions/reconnexions, découverte automatique LAN UDP Zero-Config, cycle d'arbitrage, Intelligence Artificielle FSM, composants d'interface et gestionnaire d'icônes).
 
 Pour exécuter la suite complète de tests :
 ```powershell
-.\.venv\Scripts\pytest.exe -v
+.\.venv\Scripts\python.exe -m pytest -v
 ```
 
-Tous les modules sont vérifiés et garantissent un taux de réussite de **100% (80/80)**.
+Tous les modules sont vérifiés et garantissent un taux de réussite de **100% (100/100)**.
 
 ---
 

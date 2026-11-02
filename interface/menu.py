@@ -33,11 +33,13 @@ class MainMenu:
         on_host_game: Callable[[], None],
         on_join_game: Callable[[], None],
         on_quit: Callable[[], None],
+        on_play_ai: Optional[Callable[[], None]] = None,
     ) -> None:
         self.on_play_local = on_play_local
         self.on_host_game = on_host_game
         self.on_join_game = on_join_game
         self.on_quit = on_quit
+        self.on_play_ai = on_play_ai
 
         # Typographies
         self.font_logo = pygame.font.SysFont("Segoe UI", 68, bold=True)
@@ -46,49 +48,101 @@ class MainMenu:
 
         # Création des boutons centrés
         btn_w = 440
-        btn_h = 64
-        start_y = 380
-        spacing = 86
         center_x = (SCREEN_WIDTH - btn_w) // 2
 
-        self.buttons: list[UIButton] = [
-            UIButton(
-                pygame.Rect(center_x, start_y, btn_w, btn_h),
-                text="JOUER (LOCAL)",
-                scheme="green",
-                font_size=24,
-                icon_name="menu/play",
-                icon_size=(30, 30),
-                on_click=self.on_play_local,
-            ),
-            UIButton(
-                pygame.Rect(center_x, start_y + spacing, btn_w, btn_h),
-                text="HÉBERGER UNE PARTIE",
-                scheme="amber",
-                font_size=24,
-                icon_name="menu/host",
-                icon_size=(30, 30),
-                on_click=self.on_host_game,
-            ),
-            UIButton(
-                pygame.Rect(center_x, start_y + spacing * 2, btn_w, btn_h),
-                text="REJOINDRE UNE PARTIE",
-                scheme="blue",
-                font_size=24,
-                icon_name="menu/join",
-                icon_size=(30, 30),
-                on_click=self.on_join_game,
-            ),
-            UIButton(
-                pygame.Rect(center_x, start_y + spacing * 3, btn_w, btn_h),
-                text="QUITTER",
-                scheme="red",
-                font_size=24,
-                icon_name="menu/exit",
-                icon_size=(30, 30),
-                on_click=self.on_quit,
-            ),
-        ]
+        if self.on_play_ai:
+            btn_h = 58
+            start_y = 345
+            spacing = 72
+            self.buttons: list[UIButton] = [
+                UIButton(
+                    pygame.Rect(center_x, start_y, btn_w, btn_h),
+                    text="SOLO (VS IA)",
+                    scheme="green",
+                    font_size=23,
+                    icon_name="menu/ai",
+                    icon_size=(30, 30),
+                    on_click=self.on_play_ai,
+                ),
+                UIButton(
+                    pygame.Rect(center_x, start_y + spacing, btn_w, btn_h),
+                    text="DUEL LOCAL (2 JOUEURS)",
+                    scheme="green",
+                    font_size=23,
+                    icon_name="menu/play",
+                    icon_size=(30, 30),
+                    on_click=self.on_play_local,
+                ),
+                UIButton(
+                    pygame.Rect(center_x, start_y + spacing * 2, btn_w, btn_h),
+                    text="HÉBERGER UNE PARTIE LAN",
+                    scheme="amber",
+                    font_size=23,
+                    icon_name="menu/host",
+                    icon_size=(30, 30),
+                    on_click=self.on_host_game,
+                ),
+                UIButton(
+                    pygame.Rect(center_x, start_y + spacing * 3, btn_w, btn_h),
+                    text="REJOINDRE UNE PARTIE LAN",
+                    scheme="blue",
+                    font_size=23,
+                    icon_name="menu/join",
+                    icon_size=(30, 30),
+                    on_click=self.on_join_game,
+                ),
+                UIButton(
+                    pygame.Rect(center_x, start_y + spacing * 4, btn_w, btn_h),
+                    text="QUITTER",
+                    scheme="red",
+                    font_size=23,
+                    icon_name="menu/exit",
+                    icon_size=(30, 30),
+                    on_click=self.on_quit,
+                ),
+            ]
+        else:
+            btn_h = 64
+            start_y = 380
+            spacing = 86
+            self.buttons = [
+                UIButton(
+                    pygame.Rect(center_x, start_y, btn_w, btn_h),
+                    text="JOUER (LOCAL)",
+                    scheme="green",
+                    font_size=24,
+                    icon_name="menu/play",
+                    icon_size=(30, 30),
+                    on_click=self.on_play_local,
+                ),
+                UIButton(
+                    pygame.Rect(center_x, start_y + spacing, btn_w, btn_h),
+                    text="HÉBERGER UNE PARTIE",
+                    scheme="amber",
+                    font_size=24,
+                    icon_name="menu/host",
+                    icon_size=(30, 30),
+                    on_click=self.on_host_game,
+                ),
+                UIButton(
+                    pygame.Rect(center_x, start_y + spacing * 2, btn_w, btn_h),
+                    text="REJOINDRE UNE PARTIE",
+                    scheme="blue",
+                    font_size=24,
+                    icon_name="menu/join",
+                    icon_size=(30, 30),
+                    on_click=self.on_join_game,
+                ),
+                UIButton(
+                    pygame.Rect(center_x, start_y + spacing * 3, btn_w, btn_h),
+                    text="QUITTER",
+                    scheme="red",
+                    font_size=24,
+                    icon_name="menu/exit",
+                    icon_size=(30, 30),
+                    on_click=self.on_quit,
+                ),
+            ]
 
         # Index du bouton sélectionné au clavier (-1 = aucun)
         self.selected_index = 0

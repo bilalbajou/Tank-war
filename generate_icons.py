@@ -254,6 +254,40 @@ def draw_icon_exit(size: int = 64) -> pygame.Surface:
     return surf
 
 
+def draw_icon_ai(size: int = 64) -> pygame.Surface:
+    """Tête de robot militaire / cyber-tank avec visière cyan et antenne."""
+    surf = create_blank_surface(size)
+    s = size / 64.0
+
+    # Ombre
+    pygame.draw.rect(surf, C_SHADOW, pygame.Rect(14 * s, 18 * s, 38 * s, 36 * s), border_radius=int(8 * s))
+
+    # Casque / Châssis métallique
+    head_rect = pygame.Rect(12 * s, 16 * s, 40 * s, 34 * s)
+    pygame.draw.rect(surf, C_DARK_SLATE, head_rect, border_radius=int(8 * s))
+    pygame.draw.rect(surf, C_STEEL_BASE, head_rect, width=max(1, int(2.5 * s)), border_radius=int(8 * s))
+
+    # Visière cybernétique cyan
+    visor_rect = pygame.Rect(18 * s, 26 * s, 28 * s, 12 * s)
+    pygame.draw.rect(surf, C_CYAN_DARK, visor_rect, border_radius=int(4 * s))
+    pygame.draw.rect(surf, C_CYAN_LIGHT, pygame.Rect(20 * s, 28 * s, 24 * s, 8 * s), border_radius=int(3 * s))
+    pygame.draw.rect(surf, C_OUTLINE, visor_rect, width=max(1, int(1.5 * s)), border_radius=int(4 * s))
+
+    # Reflet visière
+    pygame.draw.line(surf, (255, 255, 255), (22 * s, 30 * s), (34 * s, 30 * s), max(1, int(2 * s)))
+
+    # Antenne radar sur le dessus
+    pygame.draw.line(surf, C_STEEL_LIGHT, (32 * s, 16 * s), (32 * s, 8 * s), max(1, int(2.5 * s)))
+    pygame.draw.circle(surf, C_RED_BASE, (32 * s, 7 * s), int(3.5 * s))
+    pygame.draw.circle(surf, (255, 255, 255), (31 * s, 6 * s), int(1 * s))
+
+    # Écrous / boulons latéraux
+    pygame.draw.circle(surf, C_GOLD_LIGHT, (15 * s, 32 * s), int(2.5 * s))
+    pygame.draw.circle(surf, C_GOLD_LIGHT, (49 * s, 32 * s), int(2.5 * s))
+
+    return surf
+
+
 # =============================================================================
 # 2. ICÔNES RÉSEAU & CONNEXION
 # =============================================================================
@@ -725,6 +759,8 @@ def generate_all_icons(base_dir: Optional[Path] = None) -> dict[str, Path]:
     # 1. Menu principal
     icons_menu = {
         "play.png": draw_icon_play,
+        "ai.png": draw_icon_ai,
+        "solo.png": draw_icon_ai,
         "host.png": draw_icon_host,
         "join.png": draw_icon_join,
         "settings.png": draw_icon_settings,

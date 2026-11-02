@@ -2,7 +2,8 @@
 
 Fournit :
 1. Menu Principal interactif complet (clavier et souris) :
-   - Jouer (Local 2 joueurs sur le même clavier)
+   - Mode Solo & Intelligence Artificielle (3 difficultés : Facile, Moyen, Difficile)
+   - Duel Local (2 joueurs sur le même clavier)
    - Héberger une partie LAN (PC 1 - Serveur Autoritaire)
    - Rejoindre une partie LAN (PC 2 - Client distant)
    - Quitter
@@ -13,19 +14,22 @@ Fournit :
 
 3. Salon d'attente (Lobby) :
    - Fiches des 2 joueurs avec silhouettes de chars
+   - Sélecteur de difficulté IA en direct (Facile / Moyen / Difficile)
    - Statut de préparation en temps réel
    - Compte à rebours animé dès que les 2 joueurs sont prêts
 
 4. Combat 2D à 60 FPS constants :
    - HUD complet (3 vies, score à 5, chrono 90s, bonus)
+   - Machine à états IA (Patrouille, Traque, Combat, Repli, Collecte de bonus)
    - Menu Pause (Échap / P) avec Reprendre, Recommencer et Menu
    - Écran de Victoire / Défaite avec Rejouer et Menu
 
 5. Raccourcis en ligne de commande :
-   - python main.py                  -> Menu d'accueil interactif
-   - python main.py --host           -> Démarre directement en mode Hôte
-   - python main.py --join <IP_HOTE> -> Démarre directement en mode Client
-   - python main.py --local          -> Démarre directement en mode 2 joueurs local
+   - python main.py                     -> Menu d'accueil interactif
+   - python main.py --ai [--difficulty] -> Démarre directement en mode Solo contre l'IA
+   - python main.py --host              -> Démarre directement en mode Hôte
+   - python main.py --join <IP_HOTE>    -> Démarre directement en mode Client
+   - python main.py --local             -> Démarre directement en mode 2 joueurs local
 """
 
 from __future__ import annotations
@@ -60,6 +64,7 @@ from network.client import NetworkClient
 from network.protocol import NetworkProtocol
 from game.sound_manager import sound_manager
 from game.effects import effects_manager
+from game.ai_controller import TankAIController, AIDifficulty
 
 
 class AppState(Enum):
@@ -84,8 +89,10 @@ class GameApp:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        # Mode de jeu ("local", "host", "client")
+        # Mode de jeu ("local", "host", "client", "ai")
         self.play_mode = "local"
+        self.ai_controller: Optional[TankAIController] = None
+        self.ai_difficulty = "medium"
         self.state = AppState.MENU
 
         # Entités de jeu et moteur
@@ -117,6 +124,7 @@ class GameApp:
             on_host_game=self.start_hosting,
             on_join_game=self.start_joining,
             on_quit=self.quit,
+            on_play_ai=self.start_solo_ai,
         )
         self.host_screen: Optional[HostScreen] = None
         self.join_screen: Optional[JoinScreen] = None
@@ -150,6 +158,18 @@ class GameApp:
         self.setup_tanks()
         self.lobby_screen = LobbyScreen(
             mode="local",
+            on_start_game=self.start_gameplay,
+            on_leave=self.return_to_menu,
+        )
+        self.state = AppState.LOBBY
+
+    def start_solo_ai(self) -> None:
+        """Démarre le mode solo contre l'Intelligence Artificielle."""
+        self.play_mode = "ai"
+        self.cleanup_network()
+        self.setup_tanks()
+        self.lobby_screen = LobbyScreen(
+            mode="ai",
             on_start_game=self.start_gameplay,
             on_leave=self.return_to_menu,
         )
@@ -209,6 +229,8 @@ class GameApp:
 
     def start_gameplay(self) -> None:
         """Lance le match et active la boucle de combat."""
+        if self.play_mode == "ai" and self.lobby_screen and hasattr(self.lobby_screen, "ai_difficulty"):
+            self.ai_difficulty = self.lobby_screen.ai_difficulty
         self.reset_match()
         self.state = AppState.PLAYING
 
@@ -228,6 +250,11 @@ class GameApp:
         # Audio selon le point de vue du joueur
         if self.play_mode == "local":
             sound_manager.play_victory()
+        elif self.play_mode == "ai":
+            if self.match_state.winner_id == 1:
+                sound_manager.play_victory()
+            else:
+                sound_manager.play_defeat()
         elif self.play_mode == "host":
             if self.match_state.winner_id == 1:
                 sound_manager.play_victory()
@@ -286,6 +313,18 @@ class GameApp:
             bullet_damage=1,
         )
 
+        if self.play_mode == "ai":
+            diff = AIDifficulty(self.ai_difficulty)
+            self.ai_controller = TankAIController(
+                tank=self.tank2,
+                target_tank=self.tank1,
+                arena_map=self.arena_map,
+                powerup_manager=self.powerup_manager,
+                difficulty=diff,
+            )
+        else:
+            self.ai_controller = None
+
     def reset_match(self) -> None:
         """Remet à zéro l'arène, les scores, les bonus et repositionne les tanks."""
         self.match_state.reset()
@@ -303,14 +342,34 @@ class GameApp:
         if self.tank2:
             self.tank2.respawn((PLAYER_2_SPAWN[0], PLAYER_2_SPAWN[1]), PLAYER_2_SPAWN[2])
 
+        if self.play_mode == "ai":
+            diff = AIDifficulty(self.ai_difficulty)
+            if self.ai_controller:
+                self.ai_controller.tank = self.tank2
+                self.ai_controller.target = self.tank1
+                self.ai_controller.set_difficulty(diff)
+                self.ai_controller.reset()
+            else:
+                self.ai_controller = TankAIController(
+                    tank=self.tank2,
+                    target_tank=self.tank1,
+                    arena_map=self.arena_map,
+                    powerup_manager=self.powerup_manager,
+                    difficulty=diff,
+                )
+
     def cleanup_network(self) -> None:
-        """Libère proprement toutes les sockets réseau."""
+        """Libère proprement toutes les sockets réseau et écouteurs de découverte."""
         if self.client:
             self.client.disconnect()
             self.client = None
         if self.server:
             self.server.stop()
             self.server = None
+        if self.join_screen:
+            if hasattr(self.join_screen, "discovery_listener") and self.join_screen.discovery_listener:
+                self.join_screen.discovery_listener.stop()
+                self.join_screen.discovery_listener = None
 
     # -------------------------------------------------------------------------
     # BOUCLE PRINCIPALE & TRAITEMENT DES ÉVÉNEMENTS
@@ -498,6 +557,13 @@ class GameApp:
                 else:
                     self.tank2.direction = pygame.Vector2(0.0, 0.0)
 
+            # Traitement de l'Intelligence Artificielle en Mode Solo
+            elif self.play_mode == "ai" and self.ai_controller and self.tank2.is_alive and not self.match_state.is_game_over:
+                ai_dir, ai_shoot = self.ai_controller.update(dt)
+                self.tank2.direction = ai_dir
+                if ai_shoot and self.tank2.can_shoot():
+                    self.projectile_manager.spawn_projectile(self.tank2)
+
             # Simulation autoritaire
             if not self.match_state.is_game_over:
                 self.match_state.update(dt)
@@ -533,6 +599,8 @@ class GameApp:
                     self.tank2.respawn((PLAYER_2_SPAWN[0], PLAYER_2_SPAWN[1]), PLAYER_2_SPAWN[2])
                     self.projectile_manager.clear()
                     self.match_state.acknowledge_respawn()
+                    if self.ai_controller:
+                        self.ai_controller.reset()
 
             # Diffusion des instantanés à 30 Hz vers le client
             if self.play_mode == "host" and self.server and self.server.has_client_connected() and self.server.should_broadcast_snapshot():
@@ -613,7 +681,7 @@ class GameApp:
 
             # Surimpression en cas de Fin de Partie
             elif self.state == AppState.GAME_OVER:
-                local_id = 1 if self.play_mode == "host" else (2 if self.play_mode == "client" else None)
+                local_id = 1 if self.play_mode in ("host", "ai") else (2 if self.play_mode == "client" else None)
                 self.game_over_overlay.draw(
                     self.screen,
                     winner_id=self.match_state.winner_id,
@@ -666,7 +734,7 @@ class GameApp:
         if self.tank1 and self.tank2:
             self.hud.draw(self.screen, self.match_state, self.tank1, self.tank2, self.clock.get_fps())
 
-        # Bandeau de statut réseau en bas
+        # Bandeau de statut en bas
         if self.play_mode == "host" and self.server:
             if self.server.has_client_connected():
                 st_text = f"🟢 JOUEUR 2 CONNECTÉ | IP : {self.server.local_ip}:{self.server.port}"
@@ -682,14 +750,27 @@ class GameApp:
             surf_st = self.font_status.render(st_text, True, (46, 204, 113))
             self.screen.blit(surf_st, (20, SCREEN_HEIGHT - 30))
 
+        elif self.play_mode == "ai":
+            labels = {
+                "easy": "FACILE (RECRUE)",
+                "medium": "MOYEN (VÉTÉRAN)",
+                "hard": "DIFFICILE (ÉLITE)",
+            }
+            diff_label = labels.get(self.ai_difficulty, self.ai_difficulty.upper())
+            st_text = f"🤖 MODE SOLO CONTRE L'IA | DIFFICULTÉ : {diff_label}"
+            surf_st = self.font_status.render(st_text, True, (52, 152, 219))
+            self.screen.blit(surf_st, (20, SCREEN_HEIGHT - 30))
+
 
 def parse_arguments() -> argparse.Namespace:
     """Analyse les arguments passés en ligne de commande."""
-    parser = argparse.ArgumentParser(description="Tank War : Arena Duel (Multijoueur LAN TCP)")
+    parser = argparse.ArgumentParser(description="Tank War : Arena Duel (Multijoueur LAN TCP & Mode Solo IA)")
     parser.add_argument("--host", action="store_true", help="Démarre directement en tant qu'Hôte LAN")
     parser.add_argument("--join", "--client", type=str, default=None, dest="join_ip", help="Se connecte à l'IP de l'Hôte")
     parser.add_argument("--port", type=int, default=4242, help="Port TCP (par défaut : 4242)")
     parser.add_argument("--local", action="store_true", help="Démarre directement en mode 2 joueurs local")
+    parser.add_argument("--ai", "--solo", action="store_true", dest="solo_ai", help="Démarre directement en mode Solo contre l'IA")
+    parser.add_argument("--difficulty", type=str, choices=["easy", "medium", "hard"], default="medium", help="Niveau de difficulté de l'IA (easy, medium, hard)")
     return parser.parse_args()
 
 
@@ -707,6 +788,17 @@ def main() -> int:
             app.start_joining()
     elif args.host:
         app.start_hosting(port=args.port)
+    elif args.solo_ai:
+        app.ai_difficulty = args.difficulty
+        app.start_solo_ai()
+        if app.lobby_screen:
+            app.lobby_screen.ai_difficulty = args.difficulty
+            labels = {
+                "easy": "IA : FACILE (RECRUE)",
+                "medium": "IA : MOYEN (VÉTÉRAN)",
+                "hard": "IA : DIFFICILE (ÉLITE)",
+            }
+            app.lobby_screen.btn_diff.text = labels[args.difficulty]
     elif args.local:
         app.start_local()
 

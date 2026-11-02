@@ -28,6 +28,7 @@ from interface.components import (
 )
 from network.server import NetworkServer, get_local_ip
 from network.client import NetworkClient
+from network.discovery import LANDiscoveryListener, DiscoveredServer
 
 
 # =============================================================================
@@ -47,7 +48,7 @@ class HostScreen:
         self.on_cancel = on_cancel
 
         self.font_title = pygame.font.SysFont("Segoe UI", 36, bold=True)
-        self.font_ip = pygame.font.SysFont("Segoe UI", 48, bold=True)
+        self.font_ip = pygame.font.SysFont("Segoe UI", 36, bold=True)
         self.font_info = pygame.font.SysFont("Segoe UI", 20)
         self.font_status = pygame.font.SysFont("Segoe UI", 22, bold=True)
 
@@ -104,31 +105,44 @@ class HostScreen:
         lbl_info = self.font_info.render("Communiquez cette adresse IP au Joueur 2 :", True, (210, 215, 225))
         surface.blit(lbl_info, lbl_info.get_rect(center=(center_x, 270)))
 
-        # 2. Boîte en valeur de l'adresse IP
+        # 2. Boîte en valeur de l'adresse IP (largeur dynamique et centrage parfait)
         from interface.icon_manager import icon_manager
-        ip_box = pygame.Rect(center_x - 220, 305, 440, 74)
-        pygame.draw.rect(surface, (15, 17, 22), ip_box, border_radius=10)
-        pygame.draw.rect(surface, COLOR_GOLD_LIGHT, ip_box, width=3, border_radius=10)
-
-        # Icône Wi-Fi à gauche dans la boîte IP
-        icon_manager.draw_icon(surface, "network/wifi", (ip_box.x + 20, ip_box.centery - 18), size=(36, 36))
-
         ip_str = f"{self.server.local_ip}:{self.server.port}"
         txt_ip = self.font_ip.render(ip_str, True, COLOR_GOLD_LIGHT)
-        surface.blit(txt_ip, (ip_box.x + 75, ip_box.centery - txt_ip.get_height() // 2))
+
+        icon_w, icon_h = 32, 32
+        spacing = 16
+        padding_x = 28
+        content_w = icon_w + spacing + txt_ip.get_width()
+        box_w = max(440, content_w + padding_x * 2)
+        box_h = 68
+        ip_box = pygame.Rect(center_x - box_w // 2, 308, box_w, box_h)
+
+        pygame.draw.rect(surface, (15, 17, 22), ip_box, border_radius=12)
+        pygame.draw.rect(surface, COLOR_GOLD_LIGHT, ip_box, width=3, border_radius=12)
+
+        # Icône Wi-Fi et adresse IP groupées et centrées ensemble dans le cadre
+        start_x = ip_box.centerx - content_w // 2
+        icon_manager.draw_icon(surface, "network/wifi", (start_x, ip_box.centery - icon_h // 2), size=(icon_w, icon_h))
+        surface.blit(txt_ip, (start_x + icon_w + spacing, ip_box.centery - txt_ip.get_height() // 2))
 
         # 3. Radar / Point clignotant de recherche
         pulse_alpha = int(128 + 127 * math.sin(self.anim_time * 4.0))
-        icon_manager.draw_icon(surface, "menu/host", (center_x - 195, 422), size=(28, 28))
+        icon_manager.draw_icon(surface, "menu/host", (center_x - 195, 412), size=(28, 28))
 
         stat_text = "En attente de connexion du Joueur 2..."
         txt_status = self.font_status.render(stat_text, True, (245, 215, 120))
-        surface.blit(txt_status, (center_x - 155, 426))
+        surface.blit(txt_status, (center_x - 155, 416))
 
-        # 4. Conseils réseau
+        # 4. Badge auto-détection LAN (Zero-Config)
+        badge_text = "🟢 Diffusion UDP active : Détectable automatiquement sur le Wi-Fi local"
+        txt_badge = self.font_info.render(badge_text, True, (46, 204, 113))
+        surface.blit(txt_badge, txt_badge.get_rect(center=(center_x, 460)))
+
+        # 5. Conseils réseau
         hint_text = "Assurez-vous que les 2 ordinateurs sont connectés au même réseau Wi-Fi local."
         txt_hint = self.font_info.render(hint_text, True, (160, 165, 175))
-        surface.blit(txt_hint, txt_hint.get_rect(center=(center_x, 500)))
+        surface.blit(txt_hint, txt_hint.get_rect(center=(center_x, 505)))
 
         # Bouton d'annulation
         self.btn_cancel.draw(surface)
@@ -138,7 +152,7 @@ class HostScreen:
 # 2. ÉCRAN DE RECONNEXION / CLIENT (PC 2)
 # =============================================================================
 class JoinScreen:
-    """Écran de saisie de l'IP hôte avec connexion asynchrone sécurisée."""
+    """Écran de connexion au serveur avec Détection Automatique LAN (Zero-Config) et saisie manuelle."""
 
     STATE_IDLE = "idle"
     STATE_CONNECTING = "connecting"
@@ -158,14 +172,23 @@ class JoinScreen:
         self.error_message = ""
         self._connect_thread: Optional[threading.Thread] = None
 
-        self.font_info = pygame.font.SysFont("Segoe UI", 20)
-        self.font_status = pygame.font.SysFont("Segoe UI", 22, bold=True)
+        # Module de découverte automatique en tâche de fond (Zero-Config)
+        self.discovery_listener: Optional[LANDiscoveryListener] = LANDiscoveryListener()
+        self.discovery_listener.start()
+        self.discovered_servers: list[DiscoveredServer] = []
+        self.server_buttons: dict[str, UIButton] = {}
+
+        self.font_info = pygame.font.SysFont("Segoe UI", 18)
+        self.font_status = pygame.font.SysFont("Segoe UI", 20, bold=True)
+        self.font_section = pygame.font.SysFont("Segoe UI", 16, bold=True)
+        self.font_server_name = pygame.font.SysFont("Segoe UI", 18, bold=True)
+        self.font_server_sub = pygame.font.SysFont("Segoe UI", 14)
 
         center_x = SCREEN_WIDTH // 2
 
         # Champ de saisie pour l'IP hôte (avec port optionnel)
         self.input_ip = UITextInput(
-            pygame.Rect(center_x - 180, 290, 360, 54),
+            pygame.Rect(center_x - 180, 480, 360, 50),
             initial_text="127.0.0.1",
             placeholder="192.168.1.XX",
             max_length=21,
@@ -174,9 +197,9 @@ class JoinScreen:
 
         # Boutons d'action
         btn_w = 220
-        btn_h = 56
+        btn_h = 54
         self.btn_connect = UIButton(
-            pygame.Rect(center_x - 240, 470, btn_w, btn_h),
+            pygame.Rect(center_x - 240, 600, btn_w, btn_h),
             text="SE CONNECTER",
             scheme="green",
             font_size=20,
@@ -185,7 +208,7 @@ class JoinScreen:
             on_click=self.start_connection,
         )
         self.btn_cancel = UIButton(
-            pygame.Rect(center_x + 20, 470, btn_w, btn_h),
+            pygame.Rect(center_x + 20, 600, btn_w, btn_h),
             text="RETOUR",
             scheme="red",
             font_size=20,
@@ -196,32 +219,41 @@ class JoinScreen:
 
         self.anim_time = 0.0
 
-    def start_connection(self) -> None:
+    def connect_to_server(self, host: str, port: int = 4242) -> None:
+        """Connecte directement à un serveur détecté automatiquement en un seul clic."""
+        self.input_ip.text = f"{host}:{port}"
+        self.start_connection(host=host, port=port)
+
+    def start_connection(self, host: Optional[str] = None, port: Optional[int] = None) -> None:
         """Lance la tentative de connexion réseau dans un thread séparé (zéro gel d'écran)."""
         if self.connection_state == self.STATE_CONNECTING:
             return
 
-        target_ip_str = self.input_ip.text.strip()
-        if not target_ip_str:
-            target_ip_str = self.input_ip.placeholder
+        if host is None:
+            target_ip_str = self.input_ip.text.strip()
+            if not target_ip_str:
+                target_ip_str = self.input_ip.placeholder
 
-        # Découpage hôte et port éventuel (ex: "192.168.1.45:4242")
-        port = 4242
-        if ":" in target_ip_str:
-            parts = target_ip_str.split(":", 1)
-            host = parts[0]
-            try:
-                port = int(parts[1])
-            except ValueError:
-                port = 4242
+            # Découpage hôte et port éventuel (ex: "192.168.1.45:4242")
+            use_port = 4242
+            if ":" in target_ip_str:
+                parts = target_ip_str.split(":", 1)
+                use_host = parts[0]
+                try:
+                    use_port = int(parts[1])
+                except ValueError:
+                    use_port = 4242
+            else:
+                use_host = target_ip_str
         else:
-            host = target_ip_str
+            use_host = host
+            use_port = port or 4242
 
         self.connection_state = self.STATE_CONNECTING
         self.error_message = ""
 
         # Instanciation du client
-        self.client = NetworkClient(host_ip=host, port=port)
+        self.client = NetworkClient(host_ip=use_host, port=use_port)
 
         # Thread de connexion asynchrone
         self._connect_thread = threading.Thread(
@@ -241,7 +273,10 @@ class JoinScreen:
             self.error_message = "Impossible de joindre l'hôte (Vérifiez l'adresse IP et le Wi-Fi)"
 
     def cancel(self) -> None:
-        """Annule la tentative et quitte l'écran."""
+        """Annule la tentative, arrête l'écoute et quitte l'écran."""
+        if self.discovery_listener:
+            self.discovery_listener.stop()
+            self.discovery_listener = None
         if self.client and self.client.is_connected:
             self.client.disconnect()
         self.client = None
@@ -249,11 +284,15 @@ class JoinScreen:
         self.on_cancel()
 
     def handle_event(self, event: pygame.event.Event) -> None:
-        """Gère les entrées de formulaire."""
+        """Gère les entrées de formulaire et les clics sur serveurs détectés."""
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.cancel()
                 return
+
+        # Clics sur les boutons des serveurs découverts
+        for btn in list(self.server_buttons.values()):
+            btn.handle_event(event)
 
         enter_pressed = self.input_ip.handle_event(event)
         if enter_pressed:
@@ -263,67 +302,156 @@ class JoinScreen:
         self.btn_cancel.handle_event(event)
 
     def update(self, dt: float) -> None:
-        """Met à jour les animations et détecte le succès de connexion."""
+        """Met à jour les animations, synchronise les serveurs découverts et détecte la connexion."""
         self.anim_time += dt
         self.input_ip.update(dt)
         self.btn_connect.update(dt)
         self.btn_cancel.update(dt)
 
+        # Actualisation de la liste des serveurs découverts depuis l'écouteur UDP
+        if self.discovery_listener:
+            self.discovered_servers = self.discovery_listener.get_servers()
+
+        current_keys = set()
+        box_servers_x = (SCREEN_WIDTH - 840) // 2 + 40
+        box_servers_w = 840 - 80
+
+        for idx, s in enumerate(self.discovered_servers[:2]):
+            key = s.address_str
+            current_keys.add(key)
+            card_y = 220 + idx * 80
+            btn_w, btn_h = 145, 42
+            btn_x = box_servers_x + box_servers_w - btn_w - 20
+            btn_y = card_y + 15
+
+            if key not in self.server_buttons:
+                btn = UIButton(
+                    pygame.Rect(btn_x, btn_y, btn_w, btn_h),
+                    text="REJOINDRE",
+                    scheme="green",
+                    font_size=16,
+                    icon_name="network/connect",
+                    icon_size=(20, 20),
+                    on_click=lambda h=s.host_ip, p=s.port: self.connect_to_server(h, p),
+                )
+                self.server_buttons[key] = btn
+            else:
+                self.server_buttons[key].rect.topleft = (btn_x, btn_y)
+            self.server_buttons[key].update(dt)
+
+        # Nettoyer les boutons des serveurs expirés
+        for k in list(self.server_buttons.keys()):
+            if k not in current_keys:
+                del self.server_buttons[k]
+
         if self.connection_state == self.STATE_SUCCESS and self.client:
+            if self.discovery_listener:
+                self.discovery_listener.stop()
+                self.discovery_listener = None
             self.on_connected(self.client)
 
     def draw(self, surface: pygame.Surface) -> None:
-        """Dessine l'écran de connexion au serveur."""
+        """Dessine l'écran de connexion avec les parties détectées et la saisie manuelle."""
         surface.fill((22, 20, 24))
 
-        panel_w = 720
-        panel_h = 520
-        panel_rect = pygame.Rect((SCREEN_WIDTH - panel_w) // 2, 160, panel_w, panel_h)
+        panel_w = 840
+        panel_h = 690
+        panel_rect = pygame.Rect((SCREEN_WIDTH - panel_w) // 2, 95, panel_w, panel_h)
         draw_cartoon_panel(
             surface,
             panel_rect,
-            title="🔗  REJOINDRE UNE PARTIE",
-            subtitle="Connectez-vous au serveur hôte hébergé sur le PC 1",
+            title="🔗  REJOINDRE UNE PARTIE LAN",
+            subtitle="Détection automatique sur le Wi-Fi (Zero-Config) ou connexion manuelle",
             border_color=(52, 152, 219),
             border_radius=20,
         )
 
         center_x = SCREEN_WIDTH // 2
+        from interface.icon_manager import icon_manager
 
-        # Étiquette
-        lbl_enter = self.font_info.render("Entrez l'adresse IP de l'hôte :", True, (215, 225, 235))
-        surface.blit(lbl_enter, lbl_enter.get_rect(center=(center_x, 255)))
+        # ---------------------------------------------------------------------
+        # 1. SECTION AUTO-DÉTECTION (PARTIES SUR LE RÉSEAU LOCAL)
+        # ---------------------------------------------------------------------
+        lbl_sec1 = self.font_section.render("📡 PARTIES DÉTECTÉES SUR LE RÉSEAU LOCAL (SCAN AUTOMATIQUE) :", True, (241, 196, 15))
+        surface.blit(lbl_sec1, (panel_rect.x + 40, 185))
+
+        box_servers = pygame.Rect(panel_rect.x + 40, 212, panel_w - 80, 172)
+        pygame.draw.rect(surface, (15, 17, 23), box_servers, border_radius=12)
+        pygame.draw.rect(surface, (40, 48, 65), box_servers, width=2, border_radius=12)
+
+        if self.discovered_servers:
+            for idx, s in enumerate(self.discovered_servers[:2]):
+                card_y = box_servers.y + 8 + idx * 80
+                card_rect = pygame.Rect(box_servers.x + 10, card_y, box_servers.w - 20, 72)
+
+                # Fond de la carte de serveur
+                pygame.draw.rect(surface, (24, 30, 42), card_rect, border_radius=8)
+                pygame.draw.rect(surface, (52, 152, 219), card_rect, width=2, border_radius=8)
+
+                # Icône de char / serveur
+                icon_manager.draw_icon(surface, "network/wifi", (card_rect.x + 16, card_rect.centery - 16), size=(32, 32))
+
+                # Nom et informations de la partie
+                txt_name = self.font_server_name.render(s.server_name, True, COLOR_GOLD_LIGHT)
+                surface.blit(txt_name, (card_rect.x + 60, card_rect.y + 12))
+
+                sub_info = f"IP : {s.address_str}   |   Joueurs : {s.player_count}/{s.max_players}   |   Statut : {s.status.upper()}"
+                txt_sub = self.font_server_sub.render(sub_info, True, (170, 185, 205))
+                surface.blit(txt_sub, (card_rect.x + 60, card_rect.y + 42))
+
+                # Bouton Rejoindre dédié
+                if s.address_str in self.server_buttons:
+                    self.server_buttons[s.address_str].draw(surface)
+        else:
+            # Indicateur radar de recherche
+            radar_r = 16 + int(math.sin(self.anim_time * 4.0) * 4)
+            pygame.draw.circle(surface, (52, 152, 219), (center_x, box_servers.centery - 20), radar_r, width=2)
+            icon_manager.draw_icon(surface, "network/wifi", (center_x - 12, box_servers.centery - 32), size=(24, 24))
+
+            txt_scan = self.font_info.render("Recherche automatique d'hôtes sur votre réseau Wi-Fi local...", True, (215, 225, 235))
+            surface.blit(txt_scan, txt_scan.get_rect(center=(center_x, box_servers.centery + 16)))
+
+            txt_hint = self.font_server_sub.render("Dès que le PC 1 clique sur 'Héberger une partie', elle apparaîtra ici en 1 clic.", True, (140, 150, 165))
+            surface.blit(txt_hint, txt_hint.get_rect(center=(center_x, box_servers.centery + 44)))
+
+        # ---------------------------------------------------------------------
+        # 2. SECTION CONNEXION MANUELLE
+        # ---------------------------------------------------------------------
+        lbl_sec2 = self.font_section.render("⌨️ OU CONNEXION MANUELLE PAR IP :", True, (200, 210, 225))
+        surface.blit(lbl_sec2, (panel_rect.x + 40, 412))
+
+        lbl_ip_prompt = self.font_server_sub.render("Entrez l'adresse IP de l'hôte (avec port optionnel) :", True, (160, 170, 185))
+        surface.blit(lbl_ip_prompt, (panel_rect.x + 40, 442))
 
         # Champ de texte avec icône d'adresse IP
-        from interface.icon_manager import icon_manager
         icon_manager.draw_icon(surface, "network/ip", (self.input_ip.rect.x - 44, self.input_ip.rect.centery - 16), size=(32, 32))
         self.input_ip.draw(surface)
 
-        # Zone de statut avec icônes dynamiques
+        # ---------------------------------------------------------------------
+        # 3. MESSAGES DE STATUT / ERREUR DYNAMIQUES
+        # ---------------------------------------------------------------------
         if self.connection_state == self.STATE_CONNECTING:
             spinner_offset = int(math.sin(self.anim_time * 6.0) * 8.0)
             status_text = "Connexion en cours à l'hôte..."
             txt_st = self.font_status.render(status_text, True, (241, 196, 15))
-            st_rect = txt_st.get_rect(center=(center_x, 390))
+            st_rect = txt_st.get_rect(center=(center_x, 552))
             icon_manager.draw_icon(surface, "network/wifi", (st_rect.left - 34, st_rect.centery - 12), size=(24, 24))
             surface.blit(txt_st, st_rect)
-
-            # Point pulsant
             pygame.draw.circle(surface, (241, 196, 15), (st_rect.right + 16, st_rect.centery + spinner_offset), 5)
 
         elif self.connection_state == self.STATE_ERROR:
             txt_err = self.font_status.render(self.error_message, True, COLOR_RED)
-            st_rect = txt_err.get_rect(center=(center_x + 16, 390))
+            st_rect = txt_err.get_rect(center=(center_x + 16, 552))
             icon_manager.draw_icon(surface, "network/disconnected", (st_rect.left - 32, st_rect.centery - 12), size=(24, 24))
             surface.blit(txt_err, st_rect)
 
         elif self.connection_state == self.STATE_SUCCESS:
             txt_ok = self.font_status.render("Connecté avec succès !", True, COLOR_GREEN)
-            st_rect = txt_ok.get_rect(center=(center_x + 16, 390))
+            st_rect = txt_ok.get_rect(center=(center_x + 16, 552))
             icon_manager.draw_icon(surface, "network/connected", (st_rect.left - 32, st_rect.centery - 12), size=(24, 24))
             surface.blit(txt_ok, st_rect)
 
-        # Boutons
+        # Boutons d'action
         self.btn_connect.draw(surface)
         self.btn_cancel.draw(surface)
 

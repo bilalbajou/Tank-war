@@ -17,6 +17,7 @@ from typing import Any, Optional
 
 from network.connection import NetworkConnection
 from network.protocol import MessageType, NetworkProtocol
+from network.discovery import LANBeacon
 
 
 def get_local_ip() -> str:
@@ -44,10 +45,19 @@ class NetworkServer:
     DEFAULT_PORT = 4242
     TARGET_SYNC_RATE = 30  # 30 instantanés par seconde
 
-    def __init__(self, host: str = "0.0.0.0", port: int = DEFAULT_PORT) -> None:
+    def __init__(
+        self,
+        host: str = "0.0.0.0",
+        port: int = DEFAULT_PORT,
+        enable_discovery: bool = True,
+        server_name: Optional[str] = None,
+    ) -> None:
         self.host = host
         self.port = port
         self.local_ip = get_local_ip()
+        self.enable_discovery = enable_discovery
+        self.server_name = server_name
+        self.beacon: Optional[LANBeacon] = None
 
         self.server_socket: Optional[socket.socket] = None
         self.client_connection: Optional[NetworkConnection] = None
@@ -79,10 +89,21 @@ class NetworkServer:
             self.is_running = True
             self._stop_event.clear()
 
+            # Lancement de la balise de découverte automatique (LAN QoL)
+            if self.enable_discovery:
+                self.beacon = LANBeacon(
+                    host_ip=self.local_ip,
+                    port=self.port,
+                    server_name=self.server_name,
+                )
+                self.beacon.start()
+
             self._listener_thread = threading.Thread(target=self._accept_loop, daemon=True)
             self._listener_thread.start()
             return True
         except (socket.error, OSError) as e:
+            self.stop()
+            return False
             self.stop()
             return False
 
@@ -106,6 +127,8 @@ class NetworkServer:
                 conn = NetworkConnection(sock)
                 self.client_connection = conn
                 self.client_connected_event.set()
+                if self.beacon:
+                    self.beacon.update_status(player_count=2, status="full")
 
             except socket.timeout:
                 continue
@@ -120,6 +143,8 @@ class NetworkServer:
             self.client_connected_event.clear()
             self.client_ready = False
             self.latest_client_input = None
+            if self.beacon:
+                self.beacon.update_status(player_count=1, status="waiting")
             return None
 
         if not self.client_connection or not self.client_connection.is_connected:
@@ -149,6 +174,8 @@ class NetworkServer:
                 self.client_connected_event.clear()
                 self.client_ready = False
                 self.latest_client_input = None
+                if self.beacon:
+                    self.beacon.update_status(player_count=1, status="waiting")
                 break
 
         return self.latest_client_input
@@ -196,6 +223,10 @@ class NetworkServer:
         """Arrête le serveur et libère toutes les sockets."""
         self._stop_event.set()
         self.is_running = False
+
+        if self.beacon:
+            self.beacon.stop()
+            self.beacon = None
 
         if self.client_connection:
             self.client_connection.close()

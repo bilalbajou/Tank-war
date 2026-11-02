@@ -4,10 +4,15 @@ Centralise les constantes d'affichage, de physique, les chemins d'accès aux ass
 et la palette de couleurs cartoon.
 """
 
+import sys
 from pathlib import Path
 
-# Chemins d'accès du projet
-BASE_DIR = Path(__file__).resolve().parent
+# Chemins d'accès du projet (compatible exécution Python standard et bundle PyInstaller)
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    BASE_DIR = Path(sys._MEIPASS)
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+
 ASSETS_DIR = BASE_DIR / "assets"
 MAPS_DIR = ASSETS_DIR / "maps"
 OBSTACLES_DIR = ASSETS_DIR / "obstacles"
@@ -40,6 +45,9 @@ BUSH_SIZE = 54
 # Spawns des joueurs (Positions équilibrées pour le duel)
 PLAYER_1_SPAWN = (180, 450, 0.0)      # (X, Y, rotation en degrés)
 PLAYER_2_SPAWN = (1420, 450, 180.0)
+
+# Paramètres des projectiles
+BULLET_SPEED = 650.0
 
 # Palette de couleurs Cartoon Désertique
 COLOR_SAND = (235, 209, 153)

@@ -51,18 +51,32 @@ Le jeu est entièrement conçu pour être utilisable au **clavier** et à la **s
 
 ## 3. 🕹️ Modes de Jeu
 
-### Mode 1 : Duel Local (2 Joueurs sur le même ordinateur)
-Idéal pour jouer rapidement avec un ami sur le même clavier.
-1. Lancez le jeu : `python main.py`.
-2. Cliquez sur **⚔️ JOUER (LOCAL)**.
+### Mode 1 : Solo contre l'Intelligence Artificielle (IA)
+Idéal pour vous entraîner et perfectionner vos réflexes en solo contre un char autonome.
+1. Lancez le jeu : `python main.py` (ou directement `python main.py --ai`).
+2. Cliquez sur **🤖 SOLO (VS IA)**.
+3. Dans le salon, vous pouvez modifier le niveau de difficulté en cliquant sur le sélecteur :
+   - **Facile (Recrue)** : Déplacements lents, tirs espacés, temps de réaction tolérant.
+   - **Moyen (Vétéran)** : Collecte tactique des power-ups, strafe latéral, tirs réguliers.
+   - **Difficile (Élite)** : Visée prédictive (*lead shots* calculant la vitesse de votre char), repli immédiat si vous ramassez un bouclier, tirs chirurgicaux.
+4. Cliquez sur **🚀 LANCER LA MISSION** (le robot est déjà prêt).
+5. Le combat commence après un décompte d'1.5 seconde !
+
+### Mode 2 : Duel Local (2 Joueurs sur le même ordinateur)
+Idéal pour jouer avec un ami sur le même clavier.
+1. Lancez le jeu : `python main.py` (ou `python main.py --local`).
+2. Cliquez sur **⚔️ DUEL LOCAL (2 JOUEURS)**.
 3. Dans le salon, appuyez sur **✅ TOUS PRÊTS** (ou `ESPACE`).
 4. Le combat commence immédiatement après le décompte !
 
-### Mode 2 : Multijoueur Réseau Local (Wi-Fi LAN)
-Permet d'affronter un adversaire sur deux ordinateurs portables ou fixes connectés à la même box Wi-Fi ou partage de connexion mobile.
-- **PC 1** clique sur **📡 HÉBERGER UNE PARTIE** et communique son IP affichée.
-- **PC 2** clique sur **🔗 REJOINDRE UNE PARTIE**, saisit l'adresse IP de l'hôte et valide.
-- Les deux joueurs cliquent sur **✅ JE SUIS PRÊT** dans le salon pour lancer le match !
+### Mode 3 : Multijoueur Réseau Local (Wi-Fi LAN — Détection Automatique Zero-Config)
+Permet d'affronter un adversaire sur deux ordinateurs connectés au même réseau Wi-Fi sans Internet :
+1. **PC 1** clique sur **📡 HÉBERGER UNE PARTIE**.
+   - Le serveur TCP autoritaire démarre et diffuse automatiquement sa présence sur le réseau local.
+2. **PC 2** clique sur **🔗 REJOINDRE UNE PARTIE**.
+   - **Détection Automatique (Zero-Config)** : La partie du PC 1 apparaît immédiatement dans la liste avec son nom et son IP. Cliquez simplement sur le bouton vert **`REJOINDRE`** (1 clic, aucune saisie requise !).
+   - *Repli manuel* : Si le routeur bloque la diffusion UDP, le champ IP situé en dessous permet toujours la saisie manuelle traditionnelle.
+3. Les deux joueurs cliquent sur **✅ JE SUIS PRÊT** dans le salon pour lancer le match !
 *(Voir le document complet [docs/NETWORK_GUIDE.md](NETWORK_GUIDE.md) pour le tutoriel pas-à-pas).*
 
 ---
@@ -80,7 +94,8 @@ En cours de match, un bandeau d'information supérieur translucide présente :
 - **Section Droite (Joueur 2 Vert)** :
   - 3 cœurs de vie, rechargement et bonus du second joueur.
 - **Bandeau Inférieur** :
-  - Statut de la connexion réseau (ex: `🟢 CONNECTÉ À L'HÔTE (192.168.1.45:4242)`).
+  - En mode réseau : Statut de la connexion (ex: `🟢 CONNECTÉ À L'HÔTE (192.168.1.45:4242)`).
+  - En mode solo : Statut de l'IA et difficulté active (ex: `🤖 MODE SOLO CONTRE L'IA | DIFFICULTÉ : MOYEN (VÉTÉRAN)`).
 
 ---
 
