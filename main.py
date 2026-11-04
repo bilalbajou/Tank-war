@@ -65,6 +65,8 @@ from network.protocol import NetworkProtocol
 from game.sound_manager import sound_manager
 from game.effects import effects_manager
 from game.ai_controller import TankAIController, AIDifficulty
+from interface.resolution_manager import resolution_manager
+from assets.asset_manager import asset_manager
 
 
 class AppState(Enum):
@@ -83,9 +85,18 @@ class GameApp:
 
     def __init__(self) -> None:
         pygame.init()
-        pygame.display.set_caption(WINDOW_TITLE)
 
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.DOUBLEBUF)
+        # Initialisation du gestionnaire de résolution logique adaptatif
+        self.resolution_manager = resolution_manager
+        self.resolution_manager.init_display(
+            width=SCREEN_WIDTH,
+            height=SCREEN_HEIGHT,
+            resizable=True,
+            title=WINDOW_TITLE,
+        )
+        # Rendu universel sur la surface logique 1600x900
+        self.screen = self.resolution_manager.virtual_surface
+
         self.clock = pygame.time.Clock()
         self.running = True
 
@@ -379,8 +390,9 @@ class GameApp:
         while self.running:
             dt = self.clock.tick(FPS) / 1000.0
 
-            # 1. Gestion des événements Pygame
-            for event in pygame.event.get():
+            # 1. Gestion des événements Pygame avec adaptation de résolution et souris
+            for raw_event in pygame.event.get():
+                event = self.resolution_manager.process_event(raw_event)
                 if event.type == pygame.QUIT:
                     self.running = False
                     break
@@ -419,8 +431,9 @@ class GameApp:
             # 2. Mise à jour logique
             self.update(dt)
 
-            # 3. Rendu visuel
+            # 3. Rendu visuel et projection adaptative sur la fenêtre réelle avec letterboxing
             self.draw()
+            self.resolution_manager.render_to_screen()
             pygame.display.flip()
 
         self.cleanup_network()
@@ -701,11 +714,16 @@ class GameApp:
             if snapshot:
                 for p in snapshot.get("powerups", []):
                     pos_x, pos_y = p["x"], p["y"]
-                    glow = (100, 200, 255) if p["type"] == "shield" else (
-                        (255, 230, 100) if p["type"] == "speed" else (255, 120, 80)
+                    ptype = p.get("type", "shield")
+                    glow = (100, 200, 255) if ptype == "shield" else (
+                        (255, 230, 100) if ptype == "speed" else (255, 120, 80)
                     )
-                    pygame.draw.circle(self.screen, glow, (int(pos_x), int(pos_y)), 16, width=2)
-                    pygame.draw.circle(self.screen, glow, (int(pos_x), int(pos_y)), 8)
+                    pygame.draw.circle(self.screen, glow, (int(pos_x), int(pos_y)), 18, width=2)
+                    pup_img = asset_manager.get_image(f"powerup_{ptype}")
+                    if pup_img:
+                        self.screen.blit(pup_img, pup_img.get_rect(center=(int(pos_x), int(pos_y))))
+                    else:
+                        pygame.draw.circle(self.screen, glow, (int(pos_x), int(pos_y)), 8)
 
                 for b in snapshot.get("projectiles", []):
                     rot = b.get("rot", 0.0)

@@ -104,8 +104,9 @@ Tank war/
 ├── requirements.txt            # Spécification des dépendances Python (pygame-ce, pytest)
 ├── README.md                   # Présentation rapide, installation et démarrage
 │
-├── assets/                     # Ressources graphiques et sonores
-│   ├── icons/                  # 28 icônes cartoon transparentes 32-bit (menu/, network/, hud/, pause/, results/)
+├── assets/                     # Ressources graphiques, sonores et gestionnaire centralisé
+│   ├── asset_manager.py        # AssetManager (résolution universelle, cache mémoire, fallbacks et rotations)
+│   ├── icons/                  # 30 icônes cartoon transparentes 32-bit (menu/, network/, hud/, pause/, results/)
 │   ├── maps/                   # desert_background.png, border_tile.png
 │   ├── obstacles/              # crate.png, barrier_horizontal.png, rock_large.png, plant_cactus.png...
 │   ├── powerups/               # shield.png, speed.png, rapid_fire.png
@@ -118,12 +119,13 @@ Tank war/
 │   ├── PROJECT_DOCUMENTATION.md# Ce document (architecture, classes, logique)
 │   ├── USER_GUIDE.md           # Guide utilisateur et prise en main du jeu
 │   ├── NETWORK_GUIDE.md        # Tutoriel pas-à-pas multijoueur LAN Wi-Fi
+│   ├── DEPLOYMENT_GUIDE.md     # Guide complet de déploiement et de publication
 │   └── FAQ.md                  # Dépannage et questions fréquentes
 │
 ├── game/                       # Logique métier, moteur physique et effets
 │   ├── __init__.py
 │   ├── ai_controller.py        # TankAIController (FSM, LoS, anti-stuck, visée prédictive)
-│   ├── asset_manager.py        # Singleton de cache mémoire d'images et surfaces pré-pivotées
+│   ├── asset_manager.py        # Bridge de compatibilité vers assets/asset_manager.py
 │   ├── collision.py            # CollisionHandler (résolution continue CCD et glissement mural)
 │   ├── effects.py              # EffectsManager, explosions, particules d'impact et confettis
 │   ├── game_state.py           # MatchState (arbitrage : 3 vies, score à 5, chrono 90s, mort subite)
@@ -138,6 +140,7 @@ Tank war/
 │   ├── __init__.py
 │   ├── components.py           # UIButton avec icônes, UITextInput, UIPanel
 │   ├── icon_manager.py         # IconManager (cache multi-niveaux, redimensionnement et gestion d'états)
+│   ├── resolution_manager.py   # ResolutionManager (surface virtuelle 1600x900, mise à l'échelle et letterbox)
 │   ├── hud.py                  # Affichage tête haute (cœurs de vie, score, chrono, pips de recharge)
 │   ├── lobby.py                # LobbyScreen (fiches joueurs, bouton Prêt et compte à rebours 3s)
 │   ├── menu.py                 # MainMenu (logo animé, boutons Jouer, Héberger, Rejoindre, Quitter)
@@ -157,7 +160,7 @@ Tank war/
 │   ├── controls.py             # TankControls (mappage ZQSD / Flèches et requêtes de tir)
 │   └── tank.py                 # Tank (hitbox, vies, vitesses, tourelle, canon, rotation et bouclier)
 │
-└── tests/                      # Suite de 100 tests automatisés Pytest
+└── tests/                      # Suite de 114 tests automatisés Pytest
     ├── test_ai.py              # Tests Intelligence Artificielle (FSM, LoS, anti-stuck, visée, intégration)
     ├── test_audio_visuals.py   # Validation de l'AssetManager, SoundManager et EffectsManager
     ├── test_collisions_advanced.py # Anti-tunneling CCD, barrières métalliques, caisses destructibles

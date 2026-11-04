@@ -51,19 +51,13 @@ class PowerUp:
         self.sprite = self._load_sprite()
 
     def _load_sprite(self) -> pygame.Surface:
-        """Charge le sprite PNG transparent du bonus."""
-        candidate_paths = [
-            ASSETS_DIR / "sprites" / "powerups" / f"{self.powerup_type.value}.png",
-            ASSETS_DIR / "powerups" / f"{self.powerup_type.value}.png",
-        ]
-        for path in candidate_paths:
-            if path.exists() and path.is_file():
-                try:
-                    return pygame.image.load(str(path)).convert_alpha()
-                except pygame.error:
-                    pass
+        """Charge le sprite PNG transparent du bonus via le gestionnaire centralisé."""
+        from assets.asset_manager import asset_manager
+        img = asset_manager.get_image(f"powerup_{self.powerup_type.value}")
+        if img:
+            return img
 
-        # Fallback vectoriel
+        # Fallback vectoriel de secours
         surf = pygame.Surface((self.SIZE, self.SIZE), pygame.SRCALPHA)
         color = (52, 152, 219) if self.powerup_type == PowerUpType.SHIELD else (
             (241, 196, 15) if self.powerup_type == PowerUpType.SPEED else (231, 76, 60)

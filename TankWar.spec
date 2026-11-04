@@ -29,6 +29,9 @@ hiddenimports = [
     "pygame.transform",
     "game.ai_controller",
     "network.discovery",
+    "assets.asset_manager",
+    "interface.resolution_manager",
+    "interface.icon_manager",
 ]
 
 a = Analysis(

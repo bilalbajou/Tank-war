@@ -19,6 +19,8 @@ OBSTACLES_DIR = ASSETS_DIR / "obstacles"
 SPRITES_DIR = ASSETS_DIR / "sprites"
 SOUNDS_DIR = ASSETS_DIR / "sounds"
 FONTS_DIR = ASSETS_DIR / "fonts"
+ICONS_DIR = ASSETS_DIR / "icons"
+POWERUPS_DIR = ASSETS_DIR / "powerups"
 
 # Paramètres d'affichage
 SCREEN_WIDTH = 1600

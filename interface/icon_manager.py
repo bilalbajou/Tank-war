@@ -12,9 +12,10 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 import pygame
 
-# Chemin de base des assets
-BASE_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_ICONS_DIR = BASE_DIR / "assets" / "icons"
+from assets.asset_manager import ASSETS_DIR, ICONS_DIR, asset_manager
+
+# Chemin de base des assets résolu de manière portable et centralisée
+DEFAULT_ICONS_DIR = ICONS_DIR
 
 
 class IconManager:
@@ -92,9 +93,15 @@ class IconManager:
         if icon_name in self._raw_cache:
             return self._raw_cache[icon_name]
 
+        # 1. Requête auprès du gestionnaire centralisé des assets
+        if asset_manager.has_image(icon_name):
+            surf = asset_manager.get_image(icon_name)
+            self._raw_cache[icon_name] = surf
+            return surf
+
+        # 2. Recherche locale par chemin direct
         path = self._find_path(icon_name)
         if not path or not path.exists():
-            # Si le fichier n'existe pas encore sur disque, tentative de génération
             try:
                 from generate_icons import generate_all_icons
                 generate_all_icons(self.icons_dir)
@@ -105,14 +112,15 @@ class IconManager:
 
         if path and path.exists():
             try:
-                surf = pygame.image.load(str(path)).convert_alpha()
+                loaded = pygame.image.load(str(path))
+                surf = loaded.convert_alpha() if pygame.display.get_surface() else loaded
                 self._raw_cache[icon_name] = surf
                 return surf
             except Exception:
                 pass
 
-        # Fallback procédural
-        fallback = self._create_procedural_fallback(icon_name, 64)
+        # 3. Fallback contextuel procédural via asset_manager
+        fallback = asset_manager._create_dedicated_fallback(icon_name)
         self._raw_cache[icon_name] = fallback
         return fallback
 

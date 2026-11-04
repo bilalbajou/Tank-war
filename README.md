@@ -17,7 +17,7 @@ Deux tanks s'affrontent dans une arène désertique fermée parsemée d'obstacle
 | **Concurrence** | Multithreading (Threads non-bloquants I/O réseau & découverte) |
 | **Résolution de référence** | 1600 × 900 (Format 16:9 fixe) |
 | **Fréquence de rafraîchissement** | 60 FPS constants avec delta-time |
-| **Suite de tests** | Pytest 8.0+ (100 tests unitaires & d'intégration) |
+| **Suite de tests** | Pytest 8.0+ (114 tests unitaires & d'intégration) |
 
 ---
 
@@ -319,16 +319,30 @@ Le jeu fonctionne intégralement **sans connexion à Internet**. Deux configurat
 
 ---
 
+### 4. Raccourcis Clavier d'Affichage & Résolution
+- **`F11`** ou **`Alt + Entrée`** : Bascule instantanée entre le mode **Plein Écran** et le mode **Fenêtré**.
+- **`F2`** : Cycle parmi les résolutions prédéfinies adaptatives (720p, 768p, 900p, 1080p, 1440p).
+- **Redimensionnement à la souris** : La fenêtre peut être étirée librement ; le système de résolution logique adapte l'échelle avec letterboxing/pillarboxing et convertit automatiquement les coordonnées de la souris.
+
+---
+
 ## 🧪 Suite de Tests Automatisés
 
-Le projet comprend **100 tests automatisés** couvrant l'intégralité du cycle de vie du jeu (physique CCD, balistique, synchronisation réseau TCP, déconnexions/reconnexions, découverte automatique LAN UDP Zero-Config, cycle d'arbitrage, Intelligence Artificielle FSM, composants d'interface et gestionnaire d'icônes).
+Le projet comprend **114 tests automatisés** couvrant l'intégralité du cycle de vie du jeu :
+- Résolution logique et adaptation d'écran (1280x720, 1366x768, 1440x900, 1600x900, 1920x1080, 2560x1440, Ultrawide 21:9).
+- Gestionnaire centralisé d'assets, intégrité des icônes de récompenses et robustesse aux chemins relatifs.
+- Physique continue CCD anti-tunneling, balistique et collisions.
+- Synchronisation réseau TCP autoritaire, instantanés 30 Hz et gestion des déconnexions/reconnexions.
+- Découverte automatique LAN UDP Zero-Config.
+- Machine à états et navigation de combat de l'Intelligence Artificielle (IA).
+- Composants interactifs d'interface, boutons et saisie de texte.
 
 Pour exécuter la suite complète de tests :
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
 ```
 
-Tous les modules sont vérifiés et garantissent un taux de réussite de **100% (100/100)**.
+Tous les modules sont vérifiés et garantissent un taux de réussite de **100% (114/114)**.
 
 ---
 
